@@ -235,3 +235,14 @@ def test_standalone_app():
     t = c.get("/tutor-demo-terminal").text
     assert "<pre>" in t and "&lt;" in t or "&#x27;" in t
     assert c.get("/tutor/demo/state").json()["score"] == 0
+
+
+def test_live_broker_with_mock_replies_reads_the_real_broker(settings):
+    import dataclasses
+    from lab_tutor.web import make_router
+    s = dataclasses.replace(settings, live_broker=True)
+
+    async def resolve(request, bid):
+        return None
+    assert make_router(s, resolve).mock_broker is None
+    assert make_router(settings, resolve).mock_broker is not None

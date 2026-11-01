@@ -32,6 +32,7 @@ def _int(v: str | None, default: int) -> int:
 @dataclass
 class Settings:
     mock: bool = False
+    live_broker: bool = False  # with mock: real broker state, canned replies (no model spend)
     api_key: str = field(default="", repr=False)  # never printed
     base_url: str = "https://api.meta.ai/v1"
     model: str = "muse-spark-1.3"
@@ -51,6 +52,7 @@ class Settings:
         e = os.environ if env is None else env
         return cls(
             mock=_bool(e.get("TUTOR_MOCK")),
+            live_broker=_bool(e.get("TUTOR_LIVE_BROKER")),
             api_key=e.get("MUSE_SPARK_API_KEY", ""),
             base_url=e.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
             model=e.get("TUTOR_MODEL", "muse-spark-1.3"),

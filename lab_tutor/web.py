@@ -97,7 +97,7 @@ def make_router(
     ladder = HintLadder()
     limiter = RateLimiter(10)
     meter = meter or SpendMeter.from_settings(settings)
-    mock_broker = (broker or MockBroker()) if settings.mock else None
+    mock_broker = (broker or MockBroker()) if settings.mock and not settings.live_broker else None
     holder: dict[str, httpx.AsyncClient] = {}
     router.mock_broker = mock_broker  # type: ignore[attr-defined]
     router.limiter = limiter  # type: ignore[attr-defined]

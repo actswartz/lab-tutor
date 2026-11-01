@@ -60,6 +60,7 @@ page (the CSP says `frame-src 'self'`).
 | Variable | Default | Meaning |
 |---|---|---|
 | `TUTOR_MOCK` | `0` | `1` = fixtures and canned replies, no network |
+| `TUTOR_LIVE_BROKER` | `0` | with `TUTOR_MOCK=1`: read the real broker, keep canned replies (no model spend) |
 | `MUSE_SPARK_API_KEY` | none | API key. Server side only |
 | `MUSE_BASE_URL` | `https://api.meta.ai/v1` | OpenAI-compatible base URL |
 | `TUTOR_MODEL` | `muse-spark-1.3` | model name |
