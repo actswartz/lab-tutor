@@ -34,6 +34,9 @@ PAGE = (Path(__file__).parent / "page.html").read_text(encoding="utf-8")
 NO_STORE = {"Cache-Control": "no-store"}
 
 
+BUSY_TTL_S = 90  # longer than one streamed reply (60 s upstream timeout)
+
+
 @dataclass
 class TutorTarget:
     session_id: str
@@ -51,11 +54,11 @@ class RateLimiter:
     def __init__(self, per_minute: int = 10):
         self.per_minute = per_minute
         self._hits: dict[str, deque] = defaultdict(deque)
-        self._busy: set[str] = set()
+        self._busy: dict[str, float] = {}
 
     def acquire(self, key: str, now: float | None = None) -> str | None:
         now = time.monotonic() if now is None else now
-        if key in self._busy:
+        if now - self._busy.get(key, -1e9) < BUSY_TTL_S:  # TTL: a stream that never started can't hold the lock forever
             return "busy"
         q = self._hits[key]
         while q and now - q[0] > 60:
@@ -63,11 +66,11 @@ class RateLimiter:
         if len(q) >= self.per_minute:
             return "rate"
         q.append(now)
-        self._busy.add(key)
+        self._busy[key] = now
         return None
 
     def release(self, key: str) -> None:
-        self._busy.discard(key)
+        self._busy.pop(key, None)
 
 
 def _json(data: dict, status: int = 200) -> JSONResponse:
