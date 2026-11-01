@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import secrets
 import time
 from collections import defaultdict, deque
@@ -18,6 +19,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from .broker import (
+    MOCK_SETS,
     MockBroker,
     TutorBrokerError,
     TutorNotFound,
@@ -34,6 +36,8 @@ PAGE = (Path(__file__).parent / "page.html").read_text(encoding="utf-8")
 NO_STORE = {"Cache-Control": "no-store"}
 
 
+# an IOS prompt (R1>, corvane-r3#, R1(config-if)#) anywhere in the tail: the router is up and the student is on it
+ROUTER_PROMPT = re.compile(r"(?m)^[A-Za-z][\w.-]*(?:\([\w-]+\))?[>#]")
 BUSY_TTL_S = 90  # longer than one streamed reply (60 s upstream timeout)
 
 
@@ -97,7 +101,7 @@ def make_router(
     ladder = HintLadder()
     limiter = RateLimiter(10)
     meter = meter or SpendMeter.from_settings(settings)
-    mock_broker = (broker or MockBroker()) if settings.mock and not settings.live_broker else None
+    mock_broker = (broker or MockBroker(MOCK_SETS.get(settings.mock_lab))) if settings.mock and not settings.live_broker else None
     holder: dict[str, httpx.AsyncClient] = {}
     router.mock_broker = mock_broker  # type: ignore[attr-defined]
     router.limiter = limiter  # type: ignore[attr-defined]
@@ -131,6 +135,7 @@ def make_router(
             .replace("__GUAC_URL__", html.escape(_safe_frame_url(target.guac_url), quote=True))
             .replace("__POLL__", str(settings.poll_seconds))
             .replace("__MOCK__", "1" if settings.mock else "0")
+            .replace("__BOOT__", str(settings.router_boot_s))
         )
         csp = (
             "default-src 'self'; frame-src 'self'; connect-src 'self'; img-src 'self' data:; "
@@ -169,6 +174,7 @@ def make_router(
                 ],
                 "terminal_updated_at": st.get("terminal_updated_at"),
                 "capturing": bool(st.get("capturing")),
+                "router_seen": bool(ROUTER_PROMPT.search(st.get("terminal_tail") or "")),
                 "generated_at": st.get("generated_at"),
                 "mock": settings.mock,
             }

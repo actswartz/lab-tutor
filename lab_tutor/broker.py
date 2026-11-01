@@ -14,11 +14,11 @@ from pathlib import Path
 import httpx
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
-MOCK_FIXTURES = [
-    "sample-lab03.json",
-    "variant-typo-fixed-4of7.json",
-    "variant-all-pass-7of7.json",
-]
+MOCK_SETS = {
+    "lab03": ["sample-lab03.json", "variant-typo-fixed-4of7.json", "variant-all-pass-7of7.json"],
+    "iol01": ["sample-iol01-fail.json", "sample-iol01-pass.json"],  # real IOS router, 2 checks
+}
+MOCK_FIXTURES = MOCK_SETS["lab03"]
 _SID_RE = re.compile(r"[0-9a-f]{16,64}")
 
 

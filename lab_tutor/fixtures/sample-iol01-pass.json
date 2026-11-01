@@ -1,0 +1,27 @@
+{
+ "session_id": "152f0cbcc6cee177d83da5e43513c231",
+ "lab_id": "iol01",
+ "lab_tasks": "Tutor demo: bring up a link on the real router\n\nCorvane Logistics is adding a dock segment behind corvane-r3, a real IOS router. Its port Ethernet0/2 needs an address and has to come up.\n\n1. Log in to the router with ssh student@corvane-r3 (password labpass).\n2. Give Ethernet0/2 the address 10.20.32.1 with a /24 mask, and bring the interface up.\n3. Check it with show ip interface brief, leave the router with exit.\n4. Type lab check to see which parts pass.\n\nType 'lab' to see these tasks again, and 'lab check' to grade your work.\n",
+ "terminal_tail": "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null student@corvane-r3\nCorvane lab workspace. Devices: corvane-r1 corvane-r2   (user student / password labpass)\nTry:  curl -sk -u student:labpass https://corvane-r1/restconf/data/ietf-interfaces:interfaces | jq .\nCheck your work:  labcheck --list    then   labcheck restconf-first-steps\nnull student@corvane-r3h -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/n\nWarning: Permanently added 'corvane-r3' (RSA) to the list of known hosts.\n(student@corvane-r3) Password:\n\ncorvane-r3#terminal length 0\ncorvane-r3#configure terminal\nEnter configuration commands, one per line.  End with CNTL/Z.\ncorvane-r3(config)#interface Ethernet0/2\ncorvane-r3(config-if)#ip address 10.20.32.1 255.255.0.0\n% 10.20.0.0 overlaps with Loopback10\n% 10.20.0.0 overlaps with Loopback10\ncorvane-r3(config-if)#end\ncorvane-r3#show ip interface brief\nInterface              IP-Address      OK? Method Status                Protocol\nEthernet0/0            172.20.0.7      YES TFTP   up                    up\nEthernet0/1            10.20.31.1      YES TFTP   up                    up\nEthernet0/2            10.20.32.1      YES manual administratively down down\nEthernet0/3            unassigned      YES unset  administratively down down\nLoopback0              10.20.255.3     YES TFTP   up                    up\nLoopback10             10.20.30.1      YES TFTP   up                    up\ncorvane-r3#exit\nConnection to corvane-r3 closed.\nstudent@workspace:~$ lab check\nChecking your work...\nScore: 0/2\n  [--] corvane-r3 Ethernet0/2 has 10.20.32.1 with a /24 mask\n        hint: interface Ethernet0/2, then ip address 10.20.32.1 255.255.255.0 (a /24 is 255.255.255.0).\n  [--] corvane-r3 Ethernet0/2 is up/up\n        hint: show ip interface brief says administratively down: under interface Ethernet0/2, no shutdown.\nYour score was sent to the course.\nnull student@corvane-r3h -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/n\nWarning: Permanently added 'corvane-r3' (RSA) to the list of known hosts.\n(student@corvane-r3) Password:\n\ncorvane-r3#terminal length 0\ncorvane-r3#configure terminal\nEnter configuration commands, one per line.  End with CNTL/Z.\ncorvane-r3(config)#interface Ethernet0/2\ncorvane-r3(config-if)#ip address 10.20.32.1 255.255.255.0\ncorvane-r3(config-if)#no shutdown\ncorvane-r3(config-if)#end\ncorvane-r3#show ip interface brief\nInterface              IP-Address      OK? Method Status                Protocol\nEthernet0/0            172.20.0.7      YES TFTP   up                    up\nEthernet0/1            10.20.31.1      YES TFTP   up                    up\nEthernet0/2            10.20.32.1      YES manual up                    up\nEthernet0/3            unassigned      YES unset  administratively down down\nLoopback0              10.20.255.3     YES TFTP   up                    up\nLoopback10             10.20.30.1      YES TFTP   up                    up\ncorvane-r3#exit\nConnection to corvane-r3 closed by remote host.\nConnection to corvane-r3 closed.\nstudent@workspace:~$ lab check\nChecking your work...\nScore: 2/2  - passed\n  [ok] corvane-r3 Ethernet0/2 has 10.20.32.1 with a /24 mask\n  [ok] corvane-r3 Ethernet0/2 is up/up\nYour score was sent to the course.\nstudent@workspace:~$",
+ "terminal_updated_at": "2026-11-01T13:12:38Z",
+ "capturing": true,
+ "last_check": {
+  "score": 2,
+  "max": 2,
+  "passed": true,
+  "checks": [
+   {
+    "name": "corvane-r3 Ethernet0/2 has 10.20.32.1 with a /24 mask",
+    "ok": true,
+    "hint": ""
+   },
+   {
+    "name": "corvane-r3 Ethernet0/2 is up/up",
+    "ok": true,
+    "hint": ""
+   }
+  ],
+  "at": "2026-11-01T13:12:38Z"
+ },
+ "generated_at": "2026-11-01T13:13:14Z"
+}

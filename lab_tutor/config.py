@@ -32,6 +32,8 @@ def _int(v: str | None, default: int) -> int:
 @dataclass
 class Settings:
     mock: bool = False
+    mock_lab: str = "lab03"  # fixture set for full mock mode: lab03 | iol01
+    router_boot_s: int = 0  # >0: show "router starting" until a router prompt appears or this many seconds pass
     live_broker: bool = False  # with mock: real broker state, canned replies (no model spend)
     api_key: str = field(default="", repr=False)  # never printed
     base_url: str = "https://api.meta.ai/v1"
@@ -53,6 +55,8 @@ class Settings:
         return cls(
             mock=_bool(e.get("TUTOR_MOCK")),
             live_broker=_bool(e.get("TUTOR_LIVE_BROKER")),
+            mock_lab=e.get("TUTOR_MOCK_LAB", "lab03"),
+            router_boot_s=max(0, _int(e.get("TUTOR_ROUTER_BOOT_S"), 0)),
             api_key=e.get("MUSE_SPARK_API_KEY", ""),
             base_url=e.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
             model=e.get("TUTOR_MODEL", "muse-spark-1.3"),

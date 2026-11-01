@@ -246,3 +246,30 @@ def test_live_broker_with_mock_replies_reads_the_real_broker(settings):
         return None
     assert make_router(s, resolve).mock_broker is None
     assert make_router(settings, resolve).mock_broker is not None
+
+
+def test_router_prompt_detection():
+    from lab_tutor.web import ROUTER_PROMPT
+    for t in ["corvane-r3#show ip int brief", "R1>", "R1(config-if)#no shut"]:
+        assert ROUTER_PROMPT.search("student@workspace:~$ ssh r\n" + t)
+    for t in ["student@workspace:~$ ", "Score: 0/2", "  [--] corvane-r3 Ethernet0/2 is up/up", ""]:
+        assert not ROUTER_PROMPT.search(t)
+
+
+def test_iol01_mock_set_and_boot_note(settings):
+    import asyncio, dataclasses
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from lab_tutor.web import TutorTarget, make_router
+    s = dataclasses.replace(settings, mock_lab="iol01", router_boot_s=90)
+
+    async def resolve(request, bid):
+        return TutorTarget(session_id="ab" * 16, broker_url="http://b.invalid", guac_url="/guacamole/")
+    r = make_router(s, resolve)
+    app = FastAPI(); app.include_router(r)
+    c = TestClient(app)
+    st = c.get("/tutor/x/state").json()
+    assert st["lab_id"] == "iol01" and st["max"] == 2 and st["router_seen"] is True   # corvane-r3# in the tail
+    r.mock_broker.set_variant(1)
+    assert c.get("/tutor/x/state").json()["passed"] is True
+    assert 'data-boot="90"' in c.get("/tutor/x").text
