@@ -1,0 +1,30 @@
+id: iol-link
+title: "Bring up a link on the real router (Lab Tutor demo)"
+pass_percent: 100
+# Lab Tutor hackathon demo (2026-11). Graded on the real IOL router corvane-r3, read over SSH with Netmiko.
+# python3 -I: the grader's Netmiko, never a module the student put in ~/.local.
+task: |
+  On corvane-r3 (ssh student@corvane-r3, password labpass), configure Ethernet0/2 for the new dock segment:
+    address 10.20.32.1 with a /24 mask, and the interface up.
+  Then run:  lab check
+checks:
+  - name: "corvane-r3 Ethernet0/2 has 10.20.32.1 with a /24 mask"
+    type: command
+    run: >-
+      /usr/local/bin/python3 -I -c "from netmiko import ConnectHandler as C;
+      c=C(device_type='cisco_ios',host='corvane-r3',username='student',password='labpass',conn_timeout=20);
+      print(c.send_command('show running-config interface Ethernet0/2')); c.disconnect()"
+    timeout: 90
+    rc: 0
+    regex: "(?m)^ ip address 10\\.20\\.32\\.1 255\\.255\\.255\\.0\\s*$"
+    hint: "interface Ethernet0/2, then ip address 10.20.32.1 255.255.255.0 (a /24 is 255.255.255.0)."
+  - name: "corvane-r3 Ethernet0/2 is up/up"
+    type: command
+    run: >-
+      /usr/local/bin/python3 -I -c "from netmiko import ConnectHandler as C;
+      c=C(device_type='cisco_ios',host='corvane-r3',username='student',password='labpass',conn_timeout=20);
+      print(c.send_command('show ip interface brief')); c.disconnect()"
+    timeout: 90
+    rc: 0
+    regex: "(?m)^Ethernet0/2\\s+10\\.20\\.32\\.1\\s+YES\\s+\\S+\\s+up\\s+up"
+    hint: "show ip interface brief says administratively down: under interface Ethernet0/2, no shutdown."

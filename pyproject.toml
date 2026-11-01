@@ -21,4 +21,4 @@ include = ["lab_tutor*"]
 lab_tutor = ["fixtures/*.json", "prompts/*.md", "page.html"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "lab-host/tests"]

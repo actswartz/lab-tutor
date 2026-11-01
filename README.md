@@ -95,8 +95,9 @@ cap cannot trip. Set the prices from your account's rate card before real use.
 Everything in this repository is new work created during the hackathon: the tutor
 service, prompt builder and hint ladder, streaming client, spend meter, panel page,
 mock mode, tests and evals. The lab broker and the gateway it mounts into are
-pre-existing infrastructure and are not included here. The broker-side capture pieces
-(terminal recording and the `tutor` route) are contributed separately.
+pre-existing infrastructure and are not included here. The lab-host side, also new
+(terminal recording, the `tutor` route module, a reference app with the same contract,
+and the demo lab's graded checks), is in [`lab-host/`](lab-host/README-terminal-capture.md).
 
 ## Licence
 

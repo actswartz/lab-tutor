@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Login shell for SSH sessions into the workspace (sshd ForceCommand). Lab Tutor: when the broker gave this session a
+# terminal record dir (/run/lab/term, gateway sessions with TUTOR_CAPTURE), an interactive login runs under `script`,
+# which appends what the terminal DISPLAYS to /run/lab/term/typescript. Output only, never keystrokes (no -I), so a
+# password typed at a no-echo prompt is not recorded. Commands (`ssh host cmd`) and sessions without a tty run as usual.
+T=/run/lab/term
+if [ -n "${SSH_ORIGINAL_COMMAND:-}" ]; then
+  exec bash -c "$SSH_ORIGINAL_COMMAND"
+fi
+if [ -t 0 ] && [ -z "${LAB_TERM_RECORDING:-}" ] && [ -d "$T" ] && [ -w "$T" ]; then
+  export LAB_TERM_RECORDING=1
+  exec script -qfa -c "bash -l" "$T/typescript"
+fi
+exec bash -l
