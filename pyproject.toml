@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lab-tutor"
+version = "0.1.0"
+description = "Side-panel AI coach for hosted router labs. Never gives the answer."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = ["fastapi", "httpx"]
+
+[project.optional-dependencies]
+dev = ["pytest", "uvicorn"]
+
+[tool.setuptools.packages.find]
+include = ["lab_tutor*"]
+
+[tool.setuptools.package-data]
+lab_tutor = ["fixtures/*.json", "prompts/*.md", "page.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,52 @@
+{
+ "session_id": "bf1c18e27d60ee7d246f35f5ab4a7815",
+ "lab_id": "lab03",
+ "lab_tasks": "Lab 3: Netmiko backup and a CLI change\n\nCorvane Logistics wants a nightly configuration backup of both edge routers, plus one small CLI change, all from a Python script.\n\n1. Device login is student / labpass; use Netmiko with device_type='cisco_ios'.\n2. Connect to corvane-r1 and corvane-r2, run show running-config on each and save the output to ~/backups/<hostname>.cfg.\n3. On corvane-r2, set the description of GigabitEthernet4 to exactly spare - audited and save the configuration.\n4. Type lab check to see which parts pass.\n\nType 'lab' to see these tasks again, and 'lab check' to grade your work.\n",
+ "terminal_tail": "python3 -c \"from netmiko import ConnectHandler as C; c=C(device_type='cisco_ios',host='corvane-r3',username='student',password='labpass'); print(c.send_command('show ip interface brief')); c.disconnect()\"\nCorvane lab workspace. Devices: corvane-r1 corvane-r2   (user student / password labpass)\nTry:  curl -sk -u student:labpass https://corvane-r1/restconf/data/ietf-interfaces:interfaces | jq .\nCheck your work:  labcheck --list    then   labcheck restconf-first-steps\nprint(c.send_command('show ip interface brief')); c.disconnect()\"rd='labpass'); p\nInterface              IP-Address      OK? Method Status                Protocol\nEthernet0/0            172.20.0.7      YES TFTP   up                    up\nEthernet0/1            10.20.31.1      YES TFTP   up                    up\nEthernet0/2            unassigned      YES TFTP   administratively down down\nEthernet0/3            unassigned      YES unset  administratively down down\nLoopback0              10.20.255.3     YES TFTP   up                    up\nLoopback10             10.20.30.1      YES TFTP   up                    up\nstudent@workspace:~$ ip addr show\n1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536\narsdent@workspace:~$ read -s -p 'Router password: ' pw; echo; echo got ${#pw} cha\nRouter password:\ngot 23 chars\nstudent@workspace:~$ lab check\nChecking your work...\nScore: 4/7\n  [OK] ~/backups/corvane-r1.cfg exists and holds corvane-r1's config\n  [OK] ~/backups/corvane-r2.cfg exists and holds corvane-r2's config\n  [OK] corvane-r1 was read over SSH (show running-config)\n  [OK] corvane-r2 was read over SSH (show running-config)\n  [--] Description of GigabitEthernet4 on corvane-r2 is 'spare - audited'\n        hint: send_config_set(['interface GigabitEthernet4', 'description spare - audited'])\n  [--] That change was made through the CLI, then saved\n        hint: Use a CLI config session (send_config_set), then net_connect.save_config().\n  [--] Configuration saved with write memory on corvane-r2\n        hint: Call net_connect.save_config() after the change.\n",
+ "terminal_updated_at": "2026-11-01T12:29:58Z",
+ "capturing": true,
+ "last_check": {
+  "score": 4,
+  "max": 7,
+  "passed": false,
+  "checks": [
+   {
+    "name": "~/backups/corvane-r1.cfg exists and holds corvane-r1's config",
+    "ok": true,
+    "hint": ""
+   },
+   {
+    "name": "~/backups/corvane-r2.cfg exists and holds corvane-r2's config",
+    "ok": true,
+    "hint": ""
+   },
+   {
+    "name": "corvane-r1 was read over SSH (show running-config)",
+    "ok": true,
+    "hint": ""
+   },
+   {
+    "name": "corvane-r2 was read over SSH (show running-config)",
+    "ok": true,
+    "hint": ""
+   },
+   {
+    "name": "Description of GigabitEthernet4 on corvane-r2 is 'spare - audited'",
+    "ok": false,
+    "hint": "send_config_set(['interface GigabitEthernet4', 'description spare - audited'])"
+   },
+   {
+    "name": "That change was made through the CLI, then saved",
+    "ok": false,
+    "hint": "Use a CLI config session (send_config_set), then net_connect.save_config()."
+   },
+   {
+    "name": "Configuration saved with write memory on corvane-r2",
+    "ok": false,
+    "hint": "Call net_connect.save_config() after the change."
+   }
+  ],
+  "at": "2026-11-01T12:29:34Z"
+ },
+ "generated_at": "2026-11-01T12:29:58Z"
+}
