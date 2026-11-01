@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab Tutor</title>
+<style nonce="__NONCE__">
+:root{--bg:#f6f7f9;--panel:#fff;--fg:#1c2330;--mute:#5f6b7d;--line:#d9dee6;--ok:#12803c;--bad:#b3261e;--acc:#2456d6;--accfg:#fff;--warn:#8a5a00;--warnbg:#fff4d6}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--panel:#171c25;--fg:#e6eaf1;--mute:#97a3b6;--line:#2a3140;--ok:#4cc57a;--bad:#ff7a70;--acc:#6b93ff;--accfg:#0b1020;--warn:#f1c36b;--warnbg:#3a2f12}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#term{flex:1;min-width:0;border:0;height:100%;background:#000}
+#panel{width:380px;flex:none;height:100%;display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--line);padding:14px;gap:10px;overflow:hidden}
+h1{font-size:16px;margin:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.badge{border-radius:999px;padding:2px 10px;font-weight:600;font-size:12px;border:1px solid var(--line);white-space:nowrap}
+.badge.pass{color:var(--ok);border-color:var(--ok)}
+.badge.fail{color:var(--bad);border-color:var(--bad)}
+.badge.sim{color:var(--warn);background:var(--warnbg);border-color:var(--warn)}
+#title{color:var(--mute);font-size:13px}
+#checks{list-style:none;margin:0;padding:0;max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+#checks li{display:flex;gap:8px;padding:5px 9px;border-bottom:1px solid var(--line);font-size:12.5px}
+#checks li:last-child{border-bottom:0}
+#checks .m{font-weight:700;flex:none;width:1.2em}
+.ok .m{color:var(--ok)}.no .m{color:var(--bad)}
+#meta{color:var(--mute);font-size:12px}
+#warn{display:none;background:var(--warnbg);color:var(--warn);border:1px solid var(--warn);border-radius:8px;padding:6px 9px;font-size:12.5px}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:6px 10px}
+button.pri{background:var(--acc);color:var(--accfg);border-color:var(--acc);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+form{display:flex;gap:6px}
+input[type=text]{flex:1;min-width:0;font:inherit;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+#reply{flex:1;min-height:90px;overflow:auto;white-space:pre-wrap;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14px}
+#reply.err{color:var(--bad)}
+#reply:empty::before{content:"Ask for a hint. I will point, not tell.";color:var(--mute)}
+#foot{color:var(--mute);font-size:11.5px}
+</style>
+</head>
+<body data-poll="__POLL__" data-mock="__MOCK__">
+<iframe id="term" src="__GUAC_URL__" title="Lab terminal"></iframe>
+<aside id="panel">
+  <div class="row"><h1>Lab Tutor</h1><span id="mock" class="badge sim" hidden>SIMULATED (mock mode)</span></div>
+  <div class="row"><span id="title">Loading...</span><span id="score" class="badge" hidden></span></div>
+  <ul id="checks"></ul>
+  <div id="meta"></div>
+  <div id="warn">Terminal capture is off for this session, so I cannot see your output.</div>
+  <div class="btns">
+    <button id="b-wrong" data-a="what_went_wrong">What went wrong?</button>
+    <button id="b-hint" data-a="hint" class="pri">Hint</button>
+    <button id="b-expl" data-a="explain_output">Explain this output</button>
+  </div>
+  <form id="f"><input id="q" type="text" maxlength="500" placeholder="Ask a question..." autocomplete="off"><button id="go" type="submit">Ask</button></form>
+  <div id="reply" aria-live="polite"></div>
+  <div id="foot">I give hints, never the answer.</div>
+</aside>
+<script nonce="__NONCE__">
+(function(){
+  var base = location.pathname.replace(/\/+$/, "");
+  var poll = (parseInt(document.body.dataset.poll, 10) || 5) * 1000;
+  var $ = function(id){ return document.getElementById(id); };
+  var updatedAt = null, busy = false;
+  if (document.body.dataset.mock === "1") $("mock").hidden = false;
+
+  function renderState(s){
+    if (s.status !== "ok"){
+      $("title").textContent = s.status === "not_ready" ? "Lab is starting (" + (s.session_status || "...") + ")" : "Waiting for the lab...";
+      return;
+    }
+    $("title").textContent = s.lab_title || s.lab_id || "";
+    var sc = $("score");
+    if (s.score === null || s.score === undefined){ sc.hidden = true; }
+    else { sc.hidden = false; sc.textContent = s.score + "/" + s.max; sc.className = "badge " + (s.passed ? "pass" : "fail"); }
+    var ul = $("checks"); ul.textContent = "";
+    (s.checks || []).forEach(function(c){
+      var li = document.createElement("li"); li.className = c.ok ? "ok" : "no";
+      var m = document.createElement("span"); m.className = "m"; m.textContent = c.ok ? "✓" : "✗";
+      var t = document.createElement("span"); t.textContent = c.name;
+      li.appendChild(m); li.appendChild(t); ul.appendChild(li);
+    });
+    if (!(s.checks || []).length){ var e = document.createElement("li"); e.textContent = "No lab check yet. Run: lab check"; ul.appendChild(e); }
+    $("warn").style.display = s.capturing ? "none" : "block";
+    updatedAt = s.terminal_updated_at ? Date.parse(s.terminal_updated_at) : null;
+    tick();
+  }
+  function tick(){
+    var m = $("meta");
+    if (!updatedAt || isNaN(updatedAt)){ m.textContent = ""; return; }
+    var d = Math.max(0, Math.round((Date.now() - updatedAt) / 1000));
+    m.textContent = "terminal updated " + (d < 90 ? d + " s" : Math.round(d / 60) + " min") + " ago";
+  }
+  function load(){
+    fetch(base + "/state", {cache: "no-store"}).then(function(r){ return r.json(); }).then(renderState).catch(function(){});
+  }
+  load(); setInterval(load, poll); setInterval(tick, 1000);
+
+  function setBusy(b){ busy = b; document.querySelectorAll("button").forEach(function(x){ x.disabled = b; }); }
+  function ask(action, question){
+    if (busy) return;
+    var out = $("reply"); out.textContent = ""; out.className = "";
+    setBusy(true);
+    fetch(base + "/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({action: action, question: question || null})})
+    .then(function(r){
+      if (!r.ok){ throw new Error(r.status === 429 ? "Slow down a little, then try again." : "Could not reach the tutor."); }
+      var rd = r.body.getReader(), dec = new TextDecoder(), buf = "";
+      function handle(block){
+        var ev = "message", data = "";
+        block.split("\n").forEach(function(l){
+          if (l.indexOf("event:") === 0) ev = l.slice(6).trim();
+          else if (l.indexOf("data:") === 0) data += l.slice(5).trim();
+        });
+        var j = {}; try { j = JSON.parse(data); } catch(e) {}
+        if (ev === "delta") out.textContent += j.text || "";
+        else if (ev === "error"){ out.className = "err"; out.textContent = j.message || "Something went wrong."; }
+      }
+      function pump(){
+        return rd.read().then(function(x){
+          if (x.done) return;
+          buf += dec.decode(x.value, {stream: true});
+          var i;
+          while ((i = buf.indexOf("\n\n")) >= 0){ handle(buf.slice(0, i)); buf = buf.slice(i + 2); }
+          return pump();
+        });
+      }
+      return pump();
+    })
+    .catch(function(e){ out.className = "err"; out.textContent = e.message || "Could not reach the tutor."; })
+    .then(function(){ setBusy(false); load(); });
+  }
+  document.querySelectorAll("button[data-a]").forEach(function(b){ b.addEventListener("click", function(){ ask(b.dataset.a); }); });
+  $("f").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var q = $("q").value.trim();
+    if (!q) return;
+    $("q").value = "";
+    ask("ask", q);
+  });
+})();
+</script>
+</body>
+</html>
