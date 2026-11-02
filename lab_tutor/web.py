@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -27,9 +28,9 @@ from .broker import (
     fetch_tutor,
 )
 from .config import Settings
-from .muse import MuseError, Usage, stream_chat
+from .muse import MuseError, MuseIncomplete, Usage, stream_chat
 from .prompt import ACTIONS, HintLadder, build_messages
-from .spend import SpendCapReached, SpendMeter
+from .spend import SpendCapReached, SpendMeter, SpendNotConfigured
 
 log = logging.getLogger("lab_tutor.web")
 PAGE = (Path(__file__).parent / "page.html").read_text(encoding="utf-8")
@@ -38,7 +39,9 @@ NO_STORE = {"Cache-Control": "no-store"}
 
 # an IOS prompt (R1>, corvane-r3#, R1(config-if)#) anywhere in the tail: the router is up and the student is on it
 ROUTER_PROMPT = re.compile(r"(?m)^[A-Za-z][\w.-]*(?:\([\w-]+\))?[>#]")
-BUSY_TTL_S = 90  # longer than one streamed reply (60 s upstream timeout)
+BUSY_TTL_S = 90
+STREAM_DEADLINE_S = 75  # whole upstream stream, so a slow drip can't outlive BUSY_TTL_S
+RETRY_MAX_TOKENS = 4000
 
 
 @dataclass
@@ -58,23 +61,29 @@ class RateLimiter:
     def __init__(self, per_minute: int = 10):
         self.per_minute = per_minute
         self._hits: dict[str, deque] = defaultdict(deque)
-        self._busy: dict[str, float] = {}
+        self._busy: dict[str, tuple[float, str]] = {}
 
-    def acquire(self, key: str, now: float | None = None) -> str | None:
+    def acquire(self, key: str, now: float | None = None) -> tuple[str | None, str | None]:
+        """Returns (token, None) on success or (None, "busy" | "rate")."""
         now = time.monotonic() if now is None else now
-        if now - self._busy.get(key, -1e9) < BUSY_TTL_S:  # TTL: a stream that never started can't hold the lock forever
-            return "busy"
+        cur = self._busy.get(key)
+        if cur is not None and now - cur[0] < BUSY_TTL_S:  # TTL: a stream that never started can't hold the lock forever
+            return None, "busy"
         q = self._hits[key]
         while q and now - q[0] > 60:
             q.popleft()
         if len(q) >= self.per_minute:
-            return "rate"
+            return None, "rate"
         q.append(now)
-        self._busy[key] = now
-        return None
+        token = secrets.token_hex(8)
+        self._busy[key] = (now, token)
+        return token, None
 
-    def release(self, key: str) -> None:
-        self._busy.pop(key, None)
+    def release(self, key: str, token: str) -> None:
+        """Only the current owner can release; an expired older stream is a no-op."""
+        cur = self._busy.get(key)
+        if cur is not None and cur[1] == token:
+            del self._busy[key]
 
 
 def _json(data: dict, status: int = 200) -> JSONResponse:
@@ -195,25 +204,48 @@ def make_router(
                 raise ValueError
         except (ValueError, AttributeError):
             return _json({"status": "bad_request"}, 400)
-        why = limiter.acquire(booking_id)
+        token, why = limiter.acquire(booking_id)
         if why:
             return _json({"status": "rate_limited", "reason": why}, 429)
 
         async def gen():
             try:
                 st = await get_state(target)
-                level = ladder.level_for(target.session_id, st, action)
+                level = ladder.peek(target.session_id, st, action)
                 msgs = build_messages(st, action, question, level)
-                if not settings.mock:
-                    await meter.check()
-                usage = Usage()
-                async for piece in stream_chat(settings, msgs, client(), usage):
-                    yield _sse("delta", {"text": piece})
                 done: dict = {"level": level}
-                if not settings.mock and usage.seen:
-                    cost = await meter.record(usage)
-                    if settings.price_in_per_mtok or settings.price_out_per_mtok:
-                        done["cost_usd"] = round(cost, 6)
+                max_tokens = settings.max_tokens
+                for attempt in (0, 1):
+                    usage = Usage()
+                    sent = False
+                    rid = None
+                    try:
+                        if not settings.mock:
+                            try:
+                                meter.require_prices()
+                            except SpendNotConfigured as e:
+                                log.error("tutor not configured: %s", e)
+                                yield _sse("error", {"message": "The tutor is not configured."})
+                                return
+                            rid = await meter.reserve(meter.max_cost(msgs, max_tokens))
+                        async with asyncio.timeout(STREAM_DEADLINE_S):
+                            async for piece in stream_chat(settings, msgs, client(), usage, max_tokens):
+                                sent = sent or bool(piece.strip())
+                                yield _sse("delta", {"text": piece})
+                    except MuseIncomplete:
+                        if attempt == 0 and not sent:
+                            max_tokens = max(max_tokens, min(max_tokens * 2, RETRY_MAX_TOKENS))
+                            continue
+                        raise
+                    finally:
+                        if rid is not None:
+                            await asyncio.shield(meter.settle(rid, usage if usage.seen else None))
+                    break
+                if not settings.mock and usage.seen and (meter.price_in or meter.price_out):
+                    done["cost_usd"] = round(meter.cost_of(usage.prompt_tokens, usage.completion_tokens), 6)
+                if usage.finish_reason == "length":
+                    done["truncated"] = True
+                ladder.commit(target.session_id, st, level)
                 yield _sse("done", done)
             except SpendCapReached:
                 yield _sse("error", {"message": "The tutor has reached its spend limit."})
@@ -221,13 +253,15 @@ def make_router(
                 yield _sse("error", {"message": "The lab session is not ready yet."})
             except (TutorBrokerError, ValueError):
                 yield _sse("error", {"message": "Could not read your lab session."})
-            except MuseError:
+            except MuseIncomplete:
+                yield _sse("error", {"message": "The tutor could not finish an answer. Try again."})
+            except (MuseError, TimeoutError):
                 yield _sse("error", {"message": "The tutor is unavailable right now."})
             except Exception as e:  # never leak details to the browser
                 log.error("ask failed: %s", type(e).__name__)
                 yield _sse("error", {"message": "Something went wrong."})
             finally:
-                limiter.release(booking_id)
+                limiter.release(booking_id, token)
 
         return StreamingResponse(
             gen(), media_type="text/event-stream", headers={**NO_STORE, "X-Accel-Buffering": "no"}

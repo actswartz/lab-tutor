@@ -2,8 +2,10 @@
 """Run evals/cases.json through build_messages + stream_chat.
 
 Mock by default. Real API only with --live AND MUSE_SPARK_API_KEY set.
-Only must_not substrings are checked automatically; `must` items that start
-with "[" (like "[Hint 3]") are checked too, the rest are shown for a human.
+Checked automatically: reply not empty, starts with "[Hint <n>]" or "[Done]",
+no must_not substring (case-insensitive), and `must` items that start with "["
+(like "[Hint 3]"). Other `must` items are shown for a human.
+--live goes through SpendMeter (reserve/settle, TUTOR_SPEND_FILE) and needs both prices.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import argparse
 import asyncio
 import dataclasses
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -21,11 +24,27 @@ sys.path.insert(0, str(ROOT))
 import httpx  # noqa: E402
 
 from lab_tutor.config import Settings  # noqa: E402
-from lab_tutor.muse import Usage, stream_chat  # noqa: E402
+from lab_tutor.muse import MuseError, Usage, stream_chat  # noqa: E402
 from lab_tutor.prompt import build_messages  # noqa: E402
+from lab_tutor.spend import SpendCapReached, SpendMeter, SpendNotConfigured  # noqa: E402
+
+FORMAT_OK = re.compile(r"\[(Hint \d\]|Done\])")
 
 
-async def run_case(settings, case, client):
+def check_reply(reply: str, case: dict) -> tuple[list[str], list[str]]:
+    """Return (problems, missing). `problems` includes empty/format failures and leaks."""
+    problems: list[str] = []
+    if not reply.strip():
+        return ["empty reply"], []
+    if not FORMAT_OK.match(reply.lstrip()):
+        problems.append("bad format (want [Hint n] or [Done] first)")
+    low = reply.lower()
+    problems += [s for s in case.get("must_not", []) if s.lower() in low]
+    missing = [m for m in case.get("must", []) if m.startswith("[") and m.lower() not in low]
+    return problems, missing
+
+
+async def run_case(settings, case, client, meter=None):
     state = {
         "lab_id": case.get("lab_id"),
         "lab_tasks": case.get("lab_tasks", ""),
@@ -37,11 +56,21 @@ async def run_case(settings, case, client):
     level = int(case.get("level", 3 if case["id"] == "escalate" else 1))
     msgs = build_messages(state, action, q, level)
     usage = Usage()
-    reply = "".join([p async for p in stream_chat(settings, msgs, client, usage)])
-    low = reply.lower()
-    leaks = [s for s in case.get("must_not", []) if s.lower() in low]
-    missing = [m for m in case.get("must", []) if m.startswith("[") and m.lower() not in low]
-    return reply, leaks, missing, usage
+    rid = None
+    if meter is not None:  # live: hold the worst case first, settle with real usage
+        rid = await meter.reserve(meter.max_cost(msgs, settings.max_tokens))
+    err = ""
+    try:
+        reply = "".join([p async for p in stream_chat(settings, msgs, client, usage)])
+    except MuseError as e:
+        reply, err = "", f"error: {e}"
+    finally:
+        if rid is not None:
+            await meter.settle(rid, usage if usage.seen else None)
+    problems, missing = check_reply(reply, case)
+    if err:
+        problems.append(err)
+    return reply, problems, missing, usage
 
 
 async def main() -> int:
@@ -55,12 +84,24 @@ async def main() -> int:
     if a.live and not live:
         print("--live given but MUSE_SPARK_API_KEY is not set; running mock instead")
     settings = dataclasses.replace(settings, mock=not live)
+    meter = None
+    if live:
+        meter = SpendMeter.from_settings(settings)
+        try:
+            meter.require_prices()
+        except SpendNotConfigured:
+            print("refusing --live: set MUSE_PRICE_IN_PER_MTOK and MUSE_PRICE_OUT_PER_MTOK (> 0)")
+            return 2
     cases = json.loads(Path(a.cases).read_text())
     print(f"mode: {'LIVE' if live else 'MOCK'}  cases: {len(cases)}")
     rows, total_cost, fails = [], 0.0, 0
     async with httpx.AsyncClient() as client:
         for c in cases:
-            reply, leaks, missing, usage = await run_case(settings, c, client)
+            try:
+                reply, leaks, missing, usage = await run_case(settings, c, client, meter)
+            except SpendCapReached:
+                print(f"spend cap reached before case {c['id']}; stopping")
+                return 1
             cost = usage.cost_usd(settings)
             total_cost += cost
             ok = not leaks and not missing

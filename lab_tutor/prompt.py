@@ -54,20 +54,56 @@ class HintLadder:
         self._s: OrderedDict[str, tuple[frozenset[str], int]] = OrderedDict()
         self._max = max_sessions
 
-    def level_for(self, session_id: str, state: dict, action: str) -> int:
+    def peek(self, session_id: str, state: dict, action: str) -> int:
+        """Level this request would use. Does not change anything."""
         fails = failing_set(state)
         prev = self._s.get(session_id)
         if prev is None or prev[0] != fails:
-            level = 1  # new failing set: start over, a "hint" press shows level 1
-        else:
-            level = prev[1]
-            if action == "hint":
-                level = min(level + 1, MAX_LEVEL)
-        self._s[session_id] = (fails, level)
+            return 1  # new failing set: start over, a "hint" press shows level 1
+        level = prev[1]
+        if action == "hint":
+            level = min(level + 1, MAX_LEVEL)
+        return level
+
+    def commit(self, session_id: str, state: dict, level: int) -> None:
+        """Remember `level`; call only after a usable reply."""
+        self._s[session_id] = (failing_set(state), level)
         self._s.move_to_end(session_id)
         while len(self._s) > self._max:
             self._s.popitem(last=False)
+
+    def level_for(self, session_id: str, state: dict, action: str) -> int:
+        """peek + commit in one go (for callers that don't need the split)."""
+        level = self.peek(session_id, state, action)
+        self.commit(session_id, state, level)
         return level
+
+
+_HINT_LINE = re.compile(r"^(\s*)hint:", re.IGNORECASE)
+
+
+def strip_hint_lines(tail: str) -> str:
+    """Drop `hint:` lines (and their wrapped continuation lines) from a terminal tail."""
+    out: list[str] = []
+    lines = tail.split("\n")
+    i = 0
+    while i < len(lines):
+        m = _HINT_LINE.match(lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        indent = len(m.group(1))
+        i += 1
+        while (
+            i < len(lines)
+            and lines[i].strip()
+            and len(lines[i]) - len(lines[i].lstrip()) >= max(indent, 1)
+            and not re.match(r"^\s*\[(ok|--)\]", lines[i], re.IGNORECASE)
+            and not _HINT_LINE.match(lines[i])
+        ):
+            i += 1
+    return "\n".join(out)
 
 
 def build_messages(
@@ -80,7 +116,7 @@ def build_messages(
     if action not in ACTIONS:
         raise ValueError("unknown action")
     system = system_prompt if system_prompt is not None else load_system_prompt()
-    tail = (state.get("terminal_tail") or "")[-MAX_TERMINAL:]
+    tail = strip_hint_lines((state.get("terminal_tail") or "")[-MAX_TERMINAL:])
     lc = state.get("last_check")
     if lc:
         lines = [f"Score: {lc.get('score')}/{lc.get('max')}  passed: {bool(lc.get('passed'))}"]

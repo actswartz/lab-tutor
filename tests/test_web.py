@@ -102,15 +102,17 @@ def test_ask_bad_request(client, body):
 
 def test_rate_limiter_unit():
     L = RateLimiter(10)
-    assert L.acquire("k", 0) is None
-    assert L.acquire("k", 1) == "busy"
-    L.release("k")
+    t1, why = L.acquire("k", 0)
+    assert t1 and why is None
+    assert L.acquire("k", 1) == (None, "busy")
+    L.release("k", t1)
     for i in range(9):
-        assert L.acquire("k", 2 + i) is None
-        L.release("k")
-    assert L.acquire("k", 20) == "rate"
-    assert L.acquire("k", 70) is None  # window rolled
-    assert L.acquire("other", 20) is None
+        t, why = L.acquire("k", 2 + i)
+        assert t and why is None
+        L.release("k", t)
+    assert L.acquire("k", 20) == (None, "rate")
+    assert L.acquire("k", 70)[1] is None  # window rolled
+    assert L.acquire("other", 20)[1] is None
 
 
 def test_ask_rate_limit_http(client):
@@ -155,7 +157,7 @@ def _live_app(tmp_path, handler):
 
 def test_live_flow_records_spend(tmp_path):
     raw = (
-        b'data: {"choices":[{"delta":{"content":"[Hint 1] look"}}]}\n\n'
+        b'data: {"choices":[{"delta":{"content":"[Hint 1] look"},"finish_reason":"stop"}]}\n\n'
         b'data: {"choices":[],"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\n'
         b"data: [DONE]\n\n"
     )

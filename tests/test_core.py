@@ -190,7 +190,7 @@ def test_spend_unknown_prices_counts_tokens(tmp_path):
 def test_sse_parser_split_and_usage():
     raw = (
         b'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n'
-        b'data: {"choices":[{"delta":{"content":"lo \xe2\x82\xac"}}]}\n\n'
+        b'data: {"choices":[{"delta":{"content":"lo \xe2\x82\xac"},"finish_reason":"stop"}]}\n\n'
         b'data: {"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":4}}\n\n'
         b"data: [DONE]\n\n"
     )

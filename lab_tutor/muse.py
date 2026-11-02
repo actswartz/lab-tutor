@@ -21,11 +21,20 @@ class MuseError(Exception):
     """Upstream failure. Messages never contain headers, bodies or the key."""
 
 
+class MuseIncomplete(MuseError):
+    """Stream ended with no usable answer (no visible text, or no finish_reason)."""
+
+    def __init__(self) -> None:
+        super().__init__("incomplete")
+
+
 @dataclass
 class Usage:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     seen: bool = False
+    finish_reason: str | None = None
+    visible: bool = False  # any non-whitespace reply text was produced
 
     def cost_usd(self, s: Settings) -> float:
         return (
@@ -71,6 +80,8 @@ def _apply(payload: str, usage: Usage) -> str:
     text = ""
     for ch in obj.get("choices") or []:
         text += (ch.get("delta") or {}).get("content") or ""
+        if ch.get("finish_reason"):
+            usage.finish_reason = str(ch["finish_reason"])
     return text
 
 
@@ -79,8 +90,13 @@ async def stream_chat(
     messages: list[dict],
     client: httpx.AsyncClient | None,
     usage: Usage | None = None,
+    max_tokens: int | None = None,
 ) -> AsyncIterator[str]:
-    """Yield reply text. Pass a Usage object to receive token counts at the end."""
+    """Yield reply text. Pass a Usage object to receive token counts and finish_reason.
+
+    Raises MuseIncomplete (after usage was captured) if the stream ends with no
+    visible text, with no finish_reason, or was cut by "length" before any text.
+    """
     usage = usage if usage is not None else Usage()
     if settings.mock:
         async for w in MockMuse().stream(messages):
@@ -92,7 +108,7 @@ async def stream_chat(
         "model": settings.model,
         "messages": messages,
         "temperature": settings.temperature,
-        "max_completion_tokens": settings.max_tokens,
+        "max_completion_tokens": max_tokens or settings.max_tokens,
         "reasoning_effort": settings.reasoning_effort,
         "stream": True,
         "stream_options": {"include_usage": True},
@@ -104,6 +120,7 @@ async def stream_chat(
     }
     url = settings.base_url.rstrip("/") + "/chat/completions"
     parser = SSEParser()
+    done = False
     try:
         async with client.stream(
             "POST", url, json=body, headers=headers, timeout=60
@@ -114,14 +131,24 @@ async def stream_chat(
             async for chunk in r.aiter_bytes():
                 for payload in parser.feed(chunk):
                     if payload.strip() == "[DONE]":
-                        return
+                        done = True
+                        break
                     text = _apply(payload, usage)
                     if text:
+                        if text.strip():
+                            usage.visible = True
                         yield text
+                if done:
+                    break
     except httpx.HTTPError as e:
         # Log only the exception class: str(e) / request headers could carry the key.
         log.warning("muse transport error: %s", type(e).__name__)
         raise MuseError("upstream unreachable") from None
+    if not usage.visible or usage.finish_reason is None:
+        log.warning(
+            "muse incomplete reply: finish_reason=%s visible=%s", usage.finish_reason, usage.visible
+        )
+        raise MuseIncomplete()
 
 
 # ---- mock ---------------------------------------------------------------
