@@ -39,7 +39,8 @@ class Settings:
     base_url: str = "https://api.meta.ai/v1"
     model: str = "muse-spark-1.3"
     temperature: float = 0.3
-    max_tokens: int = 350
+    max_tokens: int = 1500  # Muse Spark reasons first: this budget covers hidden reasoning + ~350 visible tokens
+    reasoning_effort: str = "minimal"  # minimal | low | medium | high ("none" is rejected)
     spend_cap_usd: float = 20.0
     # 0 means "unknown": tokens are still counted, but dollars are not, so the
     # cap cannot trip. The operator must set both prices to enforce the cap.
@@ -61,7 +62,8 @@ class Settings:
             base_url=e.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
             model=e.get("TUTOR_MODEL", "muse-spark-1.3"),
             temperature=_float(e.get("TUTOR_TEMPERATURE"), 0.3),
-            max_tokens=_int(e.get("TUTOR_MAX_TOKENS"), 350),
+            max_tokens=_int(e.get("TUTOR_MAX_TOKENS"), 1500),
+            reasoning_effort=e.get("TUTOR_REASONING_EFFORT", "minimal"),
             spend_cap_usd=_float(e.get("TUTOR_SPEND_CAP_USD"), 20.0),
             price_in_per_mtok=_float(e.get("MUSE_PRICE_IN_PER_MTOK"), 0.0),
             price_out_per_mtok=_float(e.get("MUSE_PRICE_OUT_PER_MTOK"), 0.0),

@@ -203,7 +203,7 @@ def test_sse_parser_split_and_usage():
     def handler(req):
         body = json.loads(req.content)
         assert body["stream"] is True and body["stream_options"] == {"include_usage": True}
-        assert body["max_completion_tokens"] == 350 and body["model"] == "muse-spark-1.3"
+        assert body["max_completion_tokens"] == 1500 and body["reasoning_effort"] == "minimal" and body["model"] == "muse-spark-1.3"
         assert req.url.path == "/v1/chat/completions"
         return httpx.Response(200, content=raw, headers={"content-type": "text/event-stream"})
 

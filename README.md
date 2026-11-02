@@ -67,7 +67,8 @@ page (the CSP says `frame-src 'self'`).
 | `MUSE_BASE_URL` | `https://api.meta.ai/v1` | OpenAI-compatible base URL |
 | `TUTOR_MODEL` | `muse-spark-1.3` | model name |
 | `TUTOR_TEMPERATURE` | `0.3` | sampling temperature |
-| `TUTOR_MAX_TOKENS` | `350` | `max_completion_tokens` |
+| `TUTOR_MAX_TOKENS` | `1500` | `max_completion_tokens`; Muse Spark spends part of it on hidden reasoning, so keep it well above the ~350 visible tokens |
+| `TUTOR_REASONING_EFFORT` | `minimal` | `reasoning_effort` sent to the model (`minimal`, `low`, `medium`, `high`) |
 | `TUTOR_SPEND_CAP_USD` | `20` | hard stop; checked before each live call |
 | `MUSE_PRICE_IN_PER_MTOK` | `0` | USD per million input tokens. **Operator must set** |
 | `MUSE_PRICE_OUT_PER_MTOK` | `0` | USD per million output tokens. **Operator must set** |

@@ -93,6 +93,7 @@ async def stream_chat(
         "messages": messages,
         "temperature": settings.temperature,
         "max_completion_tokens": settings.max_tokens,
+        "reasoning_effort": settings.reasoning_effort,
         "stream": True,
         "stream_options": {"include_usage": True},
     }
