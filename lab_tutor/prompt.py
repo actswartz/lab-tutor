@@ -82,6 +82,31 @@ class HintLadder:
 _HINT_LINE = re.compile(r"^(\s*)hint:", re.IGNORECASE)
 
 
+# Credentials the terminal may show (the lab login printed in a banner, `curl -u user:pw`, `password=...`, or a password
+# typed as a command right after a Password: prompt). Redacted before the text reaches the model, so it can't quote them.
+_SECRET_KV = re.compile(r"(?i)\b(password|passwd|pass|secret|token|api[_-]?key)(\s*[:=]\s*|\s+)(?!\[)([^\s'\")(,;]+)")
+_CURL_U = re.compile(r"(-u\s+[^\s:]+:)(\S+)")
+_PW_PROMPT = re.compile(r"(?i)password:\s*$")
+
+
+def scrub_secrets(tail: str) -> str:
+    """Replace credential values in a terminal tail with [password], everywhere they appear."""
+    found: set[str] = set()
+    lines = tail.split("\n")
+    for i, line in enumerate(lines):
+        if i and _PW_PROMPT.search(lines[i - 1]) and line.strip() and len(line.split()) <= 2 and not line.rstrip().endswith(("#", ">", "$")):
+            found.add(line.strip()); continue            # typed at a password prompt but echoed by a confused client
+        found.update(m.group(2) for m in _CURL_U.finditer(line))
+        found.update(m.group(3) for m in _SECRET_KV.finditer(line))
+        m = re.match(r"^\s*\S*[#$>]\s*echo\s+(\S+)\s*$", line)
+        if m and any(_PW_PROMPT.search(x) for x in lines[max(0, i - 3):i]):
+            found.add(m.group(1))
+    out = tail
+    for w in sorted((w for w in found if len(w) >= 3), key=len, reverse=True):
+        out = re.sub(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", "[password]", out)
+    return out
+
+
 def strip_hint_lines(tail: str) -> str:
     """Drop `hint:` lines (and their wrapped continuation lines) from a terminal tail."""
     out: list[str] = []
@@ -116,7 +141,7 @@ def build_messages(
     if action not in ACTIONS:
         raise ValueError("unknown action")
     system = system_prompt if system_prompt is not None else load_system_prompt()
-    tail = strip_hint_lines((state.get("terminal_tail") or "")[-MAX_TERMINAL:])
+    tail = scrub_secrets(strip_hint_lines((state.get("terminal_tail") or "")[-MAX_TERMINAL:]))
     lc = state.get("last_check")
     if lc:
         lines = [f"Score: {lc.get('score')}/{lc.get('max')}  passed: {bool(lc.get('passed'))}"]

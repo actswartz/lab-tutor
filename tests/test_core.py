@@ -219,3 +219,20 @@ def test_sse_parser_split_and_usage():
     assert text == "Hello €"
     assert (u.prompt_tokens, u.completion_tokens, u.seen) == (11, 4, True)
     assert u.cost_usd(Settings(price_in_per_mtok=1e6, price_out_per_mtok=2e6)) == 19
+
+
+def test_scrub_secrets_redacts_credentials_in_terminal():
+    from lab_tutor.prompt import scrub_secrets, build_messages
+    t = ("Corvane lab workspace. Devices: corvane-r1   (user student / password labpass)\n"
+         "Try:  curl -sk -u student:labpass https://corvane-r1/restconf\n"
+         "(student@corvane-r3) Password:\n"
+         "student@workspace:~$ echo labpass\n"
+         "labpass\n"
+         "api_key=sk-abc123 token: XYZ\n"
+         "corvane-r3#show ip interface brief")
+    out = scrub_secrets(t)
+    assert "labpass" not in out and "sk-abc123" not in out and "XYZ" not in out
+    assert "password [password]" in out and "-u student:[password]" in out
+    assert "corvane-r3#show ip interface brief" in out              # normal output untouched
+    msgs = build_messages({"lab_id": "iol01", "lab_tasks": "", "terminal_tail": t, "last_check": None}, "what_went_wrong", "", 1)
+    assert "labpass" not in msgs[1]["content"].split("<terminal>")[1].split("</terminal>")[0]
