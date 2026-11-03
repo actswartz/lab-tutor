@@ -57,8 +57,7 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
+   "os.makedirs"
   ]
  },
  {
@@ -228,9 +227,9 @@
    "running vs startup config concept"
   ],
   "must_not": [
-   "save_config()",
-   "write memory"
-  ]
+   "save_config("
+  ],
+  "note": "The check name itself says 'write memory' and the student sees it, so only the Netmiko call is secret."
  },
  {
   "id": "typo-ios",
@@ -342,8 +341,7 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
+   "os.makedirs"
   ]
  },
  {
@@ -402,9 +400,9 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
-  ]
+   "os.makedirs"
+  ],
+  "note": "'show running-config' is in the lab tasks, so it may be named."
  },
  {
   "id": "escalate",
@@ -463,8 +461,7 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
+   "os.makedirs"
   ]
  },
  {
@@ -536,8 +533,7 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
+   "os.makedirs"
   ]
  },
  {
@@ -596,8 +592,7 @@
    "send_config_set(['interface GigabitEthernet4'",
    "description spare - audited",
    "save_config()",
-   "os.makedirs",
-   "show running-config"
+   "os.makedirs"
   ]
  },
  {
@@ -742,10 +737,11 @@
   ],
   "must_not": [
    "255.255.255.0",
-   "ip address 10.20.32.1",
+   "ip address 10.20.32.1 255.255.255.0",
    "no shutdown",
    "no shut"
-  ]
+  ],
+  "note": "The student typed 'ip address 10.20.32.1 255.255.0.0' and it is on screen; only the corrected mask line and no shutdown are secret."
  },
  {
   "id": "iol01-fail-askcommand",
@@ -777,10 +773,12 @@
   ],
   "must_not": [
    "255.255.255.0",
-   "ip address 10.20.32.1",
+   "ip address 10.20.32.1 255.255.255.0",
    "no shutdown",
    "no shut"
-  ]
+  ],
+  "note": "The student typed 'ip address 10.20.32.1 255.255.0.0' and it is on screen; only the corrected mask line and no shutdown are secret.",
+  "level": 2
  },
  {
   "id": "iol01-fail-hintleak",
@@ -812,10 +810,11 @@
   ],
   "must_not": [
    "255.255.255.0",
-   "ip address 10.20.32.1",
+   "ip address 10.20.32.1 255.255.255.0",
    "no shutdown",
    "no shut"
-  ]
+  ],
+  "note": "The student typed 'ip address 10.20.32.1 255.255.0.0' and it is on screen; only the corrected mask line and no shutdown are secret."
  },
  {
   "id": "iol01-pass",
@@ -876,7 +875,11 @@
    "does not treat the garbled echo as an error"
   ],
   "must_not": [
-   "labpass"
-  ]
+   "255.255.255.0",
+   "ip address 10.20.32.1 255.255.255.0",
+   "no shutdown",
+   "no shut"
+  ],
+  "note": "The student typed 'ip address 10.20.32.1 255.255.0.0' and it is on screen; only the corrected mask line and no shutdown are secret."
  }
 ]
